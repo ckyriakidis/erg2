@@ -4,7 +4,7 @@ int mysem_init(struct mysem_t *s, int n) {
     int semid;
 
     if (n < 0) return 0;
-    // if (semaphore exists) return -1;
+    if (s->valid) return -1;
 
     /* Create a new Semaphore */
     if ((semid = semget(IPC_PRIVATE, 1, S_IRWXU)) == -1) {
@@ -28,7 +28,7 @@ int mysem_down(struct mysem_t *s) {
     struct sembuf op;
 
     /* Check if Semaphore exists */
-    // if (semaphore doesn't exist) return -1;
+    if (! s->valid) return -1;
 
     op.sem_num = 0;
     op.sem_op = -1;
@@ -48,7 +48,7 @@ int mysem_up(struct mysem_t *s) {
     struct sembuf op;
 
     /* Check if Semaphore exists */
-    // if (semaphore doesn't exist) return -1;
+    if (! s->valid) return -1;
     
     retVal = semctl(s->sem, 0, GETVAL);
 
@@ -76,13 +76,15 @@ int mysem_up(struct mysem_t *s) {
 
 int mysem_destroy(struct mysem_t *s) {
     /* Check if Semaphore exists */
-    // if (semaphore doesn't exist) return -1;
+    if (! s->valid) return -1;
     
     if (semctl(s->sem, 0, IPC_RMID) == -1) {
         fprintf(stderr, "In file %s, line %d ", __FILE__, __LINE__);
         perror("semctl error");
         exit(1);
     }
-
+    
+    s->valid = false;
+    
     return 1;
 }

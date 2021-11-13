@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <pthread.h>
 #include <sys/types.h>
 #include <sys/ipc.h>
@@ -9,6 +10,7 @@
 
 struct mysem_t {
     int sem;
+    bool valid;
 };
 
 extern int mysem_init(struct mysem_t *s, int n);
