@@ -4,7 +4,7 @@
 struct train {
     int numPass;
     int maxPass;
-    bool running;
+    bool finished;
     struct mysem_t train;
     struct mysem_t passenger;
 };
@@ -22,25 +22,30 @@ void checkParams(int argc, char **argv) {
 
 void *trainThread(void *args) {
     struct train *t = (struct train *) args;
-    while (1) {
-        mysem_down(&(t->train));
-
+    while (mysem_down(&(t->train))) {
+        
         printf("Train running with %d passengers \n", t->numPass);
         sleep(5);
+        printf("Passengers left the train\n");
+        sleep(1);
         t->numPass = 0;
 
-        mysem_up(&(t->passenger));
+        int ret = mysem_up(&(t->passenger));
+        if (!ret) {
+            printf("train ended frim train\n");
+            break;
+        }
     }
     return (void *) NULL;
 }
 void *passengerThread(void *args) {
     struct train *t = (struct train *) args;
     mysem_down(&(t->passenger));
-    printf("%ld entering train, %d\n", pthread_self() % 1000, t->numPass + 1);
+    printf("Passenger n.%ld entering train, %d total\n", pthread_self() % 1000, t->numPass + 1);
     t->numPass++;
+
     if (t->numPass == t->maxPass) mysem_up(&(t->train));
     else mysem_up(&(t->passenger));
-
     return (void *) NULL;
 }
 
@@ -51,10 +56,12 @@ int main(int argc, char **argv) {
     pthread_t *pidPassengers;
 
     checkParams(argc, argv);
-    
     t.maxPass = atoi(argv[1]);
     t.numPass = 0;
-    t.running = false;
+    t.finished = false;
+    
+    t.train.valid = false;
+    t.passenger.valid = false;
     mysem_init(&(t.train), 0);
     pthread_create(&pidTrain, NULL, trainThread, &t);
     
@@ -65,7 +72,7 @@ int main(int argc, char **argv) {
         pthread_create(&pidPassengers[i], NULL, passengerThread, &t);
     }
 
-    sleep(10);
+    while(t.finished == false);
     
     return 0;
 }
