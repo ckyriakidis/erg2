@@ -57,7 +57,7 @@ void *func(void *args) {
 }
 
 int main(int argc, char *argv[]) {
-    int i, input, numWorkers, **comm;
+    int i, input, numWorkers;
     pthread_t *pid;
     
     if (argc != 2) {
@@ -69,27 +69,28 @@ int main(int argc, char *argv[]) {
     
     if (!numWorkers) exit(-1);
     
-    struct threadStruct *threadInput = malloc(sizeof(struct threadStruct));
-    struct mysem_t *s = malloc(sizeof(struct mysem_t));
-    struct mysem_t *wait = malloc(sizeof(struct mysem_t));
+    struct threadStruct threadInput;
+    threadInput.s = malloc(sizeof(struct mysem_t));
+    threadInput.s->valid = false;
+    threadInput.wait = malloc(sizeof(struct mysem_t));
+    threadInput.wait->valid = false;
     pid = (pthread_t *) malloc(numWorkers * sizeof(pthread_t));
     
-    mysem_init(&s, 0);
-    threadInput[i]->s = &s;
-    threadInput[i]->wait = &wait;
-    
+    mysem_init(threadInput.s, 0);
+    mysem_init(threadInput.wait, 0);
+        
     for (i = 0; i < numWorkers; i++)
-        pthread_create(&pid[i], NULL, func, (void *) &threadInput[i]);
+        pthread_create(&pid[i], NULL, func, (void *) &threadInput);
     
     while(scanf("%d", &input) != EOF) {
         /*do {
             for (i = 0; i < numWorkers && mysem_up(s) == 0; i++);
         } while (i == numWorkers);
         */
-        threadInput->input = input;
-        mysem_up(s);
+        threadInput.input = input;
+        mysem_up(threadInput.s);
         
-        mysem_down(wait);
+        mysem_down(threadInput.wait);
     }
 
     sleep(10);
