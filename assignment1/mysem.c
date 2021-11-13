@@ -20,7 +20,9 @@ int mysem_init(struct mysem_t *s, int n) {
         perror("semctl error");
         exit(1);
     }
-
+    
+    s->valid = true;
+    
     return 1;
 }
 
