@@ -14,8 +14,9 @@
  * -2 signaled by worker process that it has terminated
 */
 
-struct cock {
+struct threadStruct {
     struct mysem_t *s;
+    struct mysem_t *wait;
     int input;
 };
 
@@ -34,20 +35,23 @@ int isPrime(int n) {
     return 1;
 }
 
-void *func(void *myComm) {
-    struct cock *arr = (int *) myComm;
+void *func(void *args) {
+    struct threadStruct *tStruct = (struct threadStruct *) args;
+    int tmp;
     
-    while (mysem_down(arr->s)) {
-            if (isPrime(arr)) {
-                printf("%d is prime\n", arr);
-            }
-            else {
-                printf("%d is not prime\n", arr);
-            }
-            arr[0] = 1;
+    while (mysem_down(tStruct->s)) {
+        tmp = tStruct->input;
+        mysem_up(tStruct->wait);
+        if (isPrime(tmp)) {
+            printf("%d is prime\n", tmp);
+        }
+        else {
+            printf("%d is not prime\n", tmp);
+        }
+        /*  */
     }
     
-    arr[0] = -2;
+    /*send signal that you're done*/
     
     return (void *) NULL;
 }
@@ -61,28 +65,31 @@ int main(int argc, char *argv[]) {
         exit(-1);
     }
     
-    struct cock **penis = malloc(numWorkers * sizeof(struct cock));
-    struct mysem_t *s = malloc(numWorkers * sizeof(struct mysem_t));
     numWorkers = atoi(argv[1]);
     
     if (!numWorkers) exit(-1);
     
-    comm = (int *) malloc(numWorkers * sizeof(int *));
+    struct threadStruct *threadInput = malloc(sizeof(struct threadStruct));
+    struct mysem_t *s = malloc(sizeof(struct mysem_t));
+    struct mysem_t *wait = malloc(sizeof(struct mysem_t));
     pid = (pthread_t *) malloc(numWorkers * sizeof(pthread_t));
     
-    for (i = 0; i < numWorkers; i++) {
-        mysem_init(&s[i], 0);
-        penis[i]->s = &s[i];
-        pthread_create(&pid[i], NULL, func, (void *) &penis[i]);
-    }
+    mysem_init(&s, 0);
+    threadInput[i]->s = &s;
+    threadInput[i]->wait = &wait;
+    
+    for (i = 0; i < numWorkers; i++)
+        pthread_create(&pid[i], NULL, func, (void *) &threadInput[i]);
     
     while(scanf("%d", &input) != EOF) {
-        do {
-            for (i = 0; i < numWorkers && mysem_up(s[i]) == 0; i++);
+        /*do {
+            for (i = 0; i < numWorkers && mysem_up(s) == 0; i++);
         } while (i == numWorkers);
+        */
+        threadInput->input = input;
+        mysem_up(s);
         
-        penis[i]->input = input;
-        mysem_down(&s[i]);
+        mysem_down(wait);
     }
 
     sleep(10);
