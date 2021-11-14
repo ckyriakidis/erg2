@@ -1,9 +1,12 @@
 #include "../assignment1/mysem.h"
 #include <unistd.h>
 
+#define TIMESLEEP 3
+
 struct train {
     int numPass;
     int maxPass;
+    int passengersLeft;
     bool finished;
     struct mysem_t train;
     struct mysem_t passenger;
@@ -25,24 +28,33 @@ void *trainThread(void *args) {
     while (mysem_down(&(t->train))) {
         
         printf("Train running with %d passengers \n", t->numPass);
-        sleep(5);
-        printf("Passengers left the train\n");
-        sleep(1);
+        sleep(TIMESLEEP);
+        printf("Passengers left the train\n\n");
+        sleep(TIMESLEEP / 2);
         t->numPass = 0;
 
-        int ret = mysem_up(&(t->passenger));
-        if (!ret) {
-            printf("train ended frim train\n");
-            break;
+        if (t->passengersLeft == 0) {
+            printf("Ride has ended\n");
+            t->finished = true;
+            return (void *) NULL;
         }
+
+        mysem_up(&(t->passenger));
     }
     return (void *) NULL;
 }
 void *passengerThread(void *args) {
     struct train *t = (struct train *) args;
     mysem_down(&(t->passenger));
-    printf("Passenger n.%ld entering train, %d total\n", pthread_self() % 1000, t->numPass + 1);
+    printf("Passenger %ld entering train, %d total in train\n", pthread_self() % 100, t->numPass + 1);
+    sleep(TIMESLEEP / 3);
     t->numPass++;
+    t->passengersLeft--;
+
+    if (t->passengersLeft == 0) {
+        mysem_up(&(t->train));
+        return (void *) NULL;
+    }
 
     if (t->numPass == t->maxPass) mysem_up(&(t->train));
     else mysem_up(&(t->passenger));
@@ -66,6 +78,7 @@ int main(int argc, char **argv) {
     pthread_create(&pidTrain, NULL, trainThread, &t);
     
     scanf("%d", &passengers);
+    t.passengersLeft = passengers;
     pidPassengers = (pthread_t *) malloc(passengers * sizeof(pthread_t));
     mysem_init(&(t.passenger), 1);
     for (i = 0; i < passengers; i++) {
