@@ -82,12 +82,7 @@ int main(int argc, char *argv[]) {
         pthread_create(&pid[i], NULL, func, (void *) &tInput);
     
     while(scanf("%d", &tInput.input) != EOF) {
-        /*do {
-            for (i = 0; i < numWorkers && mysem_up(s) == 0; i++);
-        } while (i == numWorkers);
-        */
         mysem_up(tInput.s);
-        
         mysem_down(tInput.wait);
     }
     
