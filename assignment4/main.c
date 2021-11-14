@@ -46,12 +46,13 @@ void *trainThread(void *args) {
 void *passengerThread(void *args) {
     struct train *t = (struct train *) args;
     mysem_down(&(t->passenger));
-    printf("Passenger %ld entering train, %d total in train\n", pthread_self() % 100, t->numPass + 1);
+    printf("Passenger %ld entering train, %d total in train\n", pthread_self() % 10000, t->numPass + 1);
     sleep(TIMESLEEP / 3);
     t->numPass++;
     t->passengersLeft--;
 
     if (t->passengersLeft == 0) {
+        printf("No more passengers left\n");
         mysem_up(&(t->train));
         return (void *) NULL;
     }
