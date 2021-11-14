@@ -17,6 +17,8 @@
 struct threadStruct {
     struct mysem_t *s;
     struct mysem_t *wait;
+    struct mysem_t *childDone;
+    bool mainDone;
     int input;
 };
 
@@ -39,7 +41,9 @@ void *func(void *args) {
     struct threadStruct *tStruct = (struct threadStruct *) args;
     int tmp;
     
-    while (mysem_down(tStruct->s)) {
+    while (! tStruct->mainDone) {
+        mysem_down(tStruct->s);
+        
         tmp = tStruct->input;
         mysem_up(tStruct->wait);
         if (isPrime(tmp)) {
@@ -52,13 +56,15 @@ void *func(void *args) {
     }
     
     /*send signal that you're done*/
+    mysem_up(tStruct->childDone);
     
     return (void *) NULL;
 }
 
 int main(int argc, char *argv[]) {
-    int i, input, numWorkers;
+    int i, numWorkers;
     pthread_t *pid;
+    struct threadStruct threadInput;
     
     if (argc != 2) {
         fprintf(stderr, "format: ./primeThreads <number of threads>\n");
@@ -69,31 +75,43 @@ int main(int argc, char *argv[]) {
     
     if (!numWorkers) exit(-1);
     
-    struct threadStruct threadInput;
+    threadInput.mainDone = false;
+    
     threadInput.s = malloc(sizeof(struct mysem_t));
     threadInput.s->valid = false;
+    
     threadInput.wait = malloc(sizeof(struct mysem_t));
     threadInput.wait->valid = false;
+    
+    threadInput.childDone = malloc(sizeof(struct mysem_t));
+    threadInput.childDone->valid = false;
+    
     pid = (pthread_t *) malloc(numWorkers * sizeof(pthread_t));
     
     mysem_init(threadInput.s, 0);
     mysem_init(threadInput.wait, 0);
-        
+    mysem_init(threadInput.childDone, 0);
+    
+    
     for (i = 0; i < numWorkers; i++)
         pthread_create(&pid[i], NULL, func, (void *) &threadInput);
     
-    while(scanf("%d", &input) != EOF) {
+    while(scanf("%d", &threadInput.input) != EOF) {
         /*do {
             for (i = 0; i < numWorkers && mysem_up(s) == 0; i++);
         } while (i == numWorkers);
         */
-        threadInput.input = input;
         mysem_up(threadInput.s);
         
         mysem_down(threadInput.wait);
     }
-
-    sleep(10);
+    
+    threadInput.mainDone = true;
+    
+    for (i = 0; i < numWorkers; i++)
+        mysem_down(threadInput.childDone);
+    
+    // sleep(10);
     /*
     do {
         for (i = 0; i < numWorkers && comm[i][0] == 1; i++);
@@ -114,5 +132,9 @@ int main(int argc, char *argv[]) {
     free(pid);
     free(comm);
     */
+    free(threadInput.s);
+    free(threadInput.wait);
+    free(threadInput.childDone);
+    
     return 0;
 }
