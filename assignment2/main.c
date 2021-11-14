@@ -77,7 +77,6 @@ int main(int argc, char *argv[]) {
     mysem_init(tInput.wait, 0);
     mysem_init(tInput.childDone, 0);
     
-    
     for (i = 0; i < numWorkers; i++)
         pthread_create(&pid[i], NULL, func, (void *) &tInput);
     
