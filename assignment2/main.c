@@ -5,15 +5,6 @@
 #include <unistd.h>
 #include "../assignment1/mysem.h"
 
-#define N 5
-
-/*
- * 1 not working
- * 0 processing
- * -1 signaled by main process to terminate
- * -2 signaled by worker process that it has terminated
-*/
-
 struct threadStruct {
     struct mysem_t *s;
     struct mysem_t *wait;
@@ -30,41 +21,35 @@ int isPrime(int n) {
             return 0;
         }
     }
- 
-    if (n <= 1)
-        return 0;
     
-    return 1;
+    return (n <= 1) ? 0 : 1;
 }
 
 void *func(void *args) {
-    struct threadStruct *tStruct = (struct threadStruct *) args;
+    struct threadStruct *tInput = (struct threadStruct *) args;
     int tmp;
     
-    while (! tStruct->mainDone) {
-        mysem_down(tStruct->s);
-        
-        tmp = tStruct->input;
-        mysem_up(tStruct->wait);
+    while (mysem_down(tInput->s) && !tInput->mainDone) {
+        tmp = tInput->input;
+        mysem_up(tInput->wait);
         if (isPrime(tmp)) {
             printf("%d is prime\n", tmp);
         }
         else {
             printf("%d is not prime\n", tmp);
         }
-        /*  */
     }
     
-    /*send signal that you're done*/
-    mysem_up(tStruct->childDone);
+    /* Signal that you're done */
+    while(! mysem_up(tInput->childDone));
     
     return (void *) NULL;
 }
 
 int main(int argc, char *argv[]) {
-    int i, numWorkers;
     pthread_t *pid;
-    struct threadStruct threadInput;
+    struct threadStruct tInput;
+    int i, numWorkers;
     
     if (argc != 2) {
         fprintf(stderr, "format: ./primeThreads <number of threads>\n");
@@ -75,66 +60,49 @@ int main(int argc, char *argv[]) {
     
     if (!numWorkers) exit(-1);
     
-    threadInput.mainDone = false;
+    tInput.mainDone = false;
     
-    threadInput.s = malloc(sizeof(struct mysem_t));
-    threadInput.s->valid = false;
+    tInput.s = malloc(sizeof(struct mysem_t));
+    tInput.s->valid = false;
     
-    threadInput.wait = malloc(sizeof(struct mysem_t));
-    threadInput.wait->valid = false;
+    tInput.wait = malloc(sizeof(struct mysem_t));
+    tInput.wait->valid = false;
     
-    threadInput.childDone = malloc(sizeof(struct mysem_t));
-    threadInput.childDone->valid = false;
+    tInput.childDone = malloc(sizeof(struct mysem_t));
+    tInput.childDone->valid = false;
     
     pid = (pthread_t *) malloc(numWorkers * sizeof(pthread_t));
     
-    mysem_init(threadInput.s, 0);
-    mysem_init(threadInput.wait, 0);
-    mysem_init(threadInput.childDone, 0);
+    mysem_init(tInput.s, 0);
+    mysem_init(tInput.wait, 0);
+    mysem_init(tInput.childDone, 0);
     
     
     for (i = 0; i < numWorkers; i++)
-        pthread_create(&pid[i], NULL, func, (void *) &threadInput);
+        pthread_create(&pid[i], NULL, func, (void *) &tInput);
     
-    while(scanf("%d", &threadInput.input) != EOF) {
+    while(scanf("%d", &tInput.input) != EOF) {
         /*do {
             for (i = 0; i < numWorkers && mysem_up(s) == 0; i++);
         } while (i == numWorkers);
         */
-        mysem_up(threadInput.s);
+        mysem_up(tInput.s);
         
-        mysem_down(threadInput.wait);
+        mysem_down(tInput.wait);
     }
     
-    threadInput.mainDone = true;
-    
+    /* Signal that you're done */
+    tInput.mainDone = true;
     for (i = 0; i < numWorkers; i++)
-        mysem_down(threadInput.childDone);
+        while(! mysem_up(tInput.s));
     
-    // sleep(10);
-    /*
-    do {
-        for (i = 0; i < numWorkers && comm[i][0] == 1; i++);
-    } while (i != numWorkers);
+    /* Wait for the workers to signal that they're done */
+    for (i = 0; i < numWorkers; i++)
+        mysem_down(tInput.childDone);
     
-    for (i = 0; i < numWorkers; i++) {
-        comm[i][0] = -1;
-    }
-    
-    do {
-        for (i = 0; i < numWorkers && comm[i][0] == -2; i++);
-    } while (i != numWorkers);
-    
-    for (i = 0; i < numWorkers; i++) {
-        free(comm[i]);
-    }
-    
-    free(pid);
-    free(comm);
-    */
-    free(threadInput.s);
-    free(threadInput.wait);
-    free(threadInput.childDone);
+    free(tInput.s);
+    free(tInput.wait);
+    free(tInput.childDone);
     
     return 0;
 }
