@@ -45,6 +45,7 @@ void *trainThread(void *args) {
 }
 void *passengerThread(void *args) {
     struct train *t = (struct train *) args;
+    printf("passenger %ld created and waiting to be called\n", pthread_self() % 10000);
     mysem_down(&(t->passenger));
     printf("Passenger %ld entering train, %d total in train\n", pthread_self() % 10000, t->numPass + 1);
     sleep(TIMESLEEP / 3);
