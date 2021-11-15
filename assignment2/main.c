@@ -97,6 +97,6 @@ int main(int argc, char *argv[]) {
     free(tInput.s);
     free(tInput.wait);
     free(tInput.childDone);
-    
+    //something to change commit
     return 0;
 }
