@@ -33,30 +33,17 @@ void *trainThread(void *args) {
         sleep(TIMESLEEP / 2);
         t->numPass = 0;
 
-        if (t->passengersLeft == 0) {
-            printf("Ride has ended\n");
-            t->finished = true;
-            return (void *) NULL;
-        }
-
         mysem_up(&(t->passenger));
     }
     return (void *) NULL;
 }
 void *passengerThread(void *args) {
     struct train *t = (struct train *) args;
-    printf("passenger %ld created and waiting to be called\n", pthread_self() % 10000);
+    // printf("passenger %ld created and waiting to be called\n", pthread_self() % 10000);
     mysem_down(&(t->passenger));
     printf("Passenger %ld entering train, %d total in train\n", pthread_self() % 10000, t->numPass + 1);
     sleep(TIMESLEEP / 3);
     t->numPass++;
-    t->passengersLeft--;
-
-    if (t->passengersLeft == 0) {
-        printf("No more passengers left\n");
-        mysem_up(&(t->train));
-        return (void *) NULL;
-    }
 
     if (t->numPass == t->maxPass) mysem_up(&(t->train));
     else mysem_up(&(t->passenger));
@@ -68,26 +55,29 @@ int main(int argc, char **argv) {
     int passengers, i;
     pthread_t pidTrain;
     pthread_t *pidPassengers;
+    int totalPassengers = 0;
 
     checkParams(argc, argv);
     t.maxPass = atoi(argv[1]);
     t.numPass = 0;
-    t.finished = false;
     
     t.train.valid = false;
     t.passenger.valid = false;
     mysem_init(&(t.train), 0);
     pthread_create(&pidTrain, NULL, trainThread, &t);
-    
-    scanf("%d", &passengers);
-    t.passengersLeft = passengers;
-    pidPassengers = (pthread_t *) malloc(passengers * sizeof(pthread_t));
+    pidPassengers = malloc(sizeof(pthread_t));
     mysem_init(&(t.passenger), 1);
-    for (i = 0; i < passengers; i++) {
-        pthread_create(&pidPassengers[i], NULL, passengerThread, &t);
+    
+    while(1) {
+        scanf("%d", &passengers);
+        totalPassengers += passengers;
+        pidPassengers = (pthread_t *) realloc(pidPassengers, totalPassengers * sizeof(pthread_t));
+        
+        for (i = totalPassengers - passengers; i < totalPassengers; i++) {
+            pthread_create(&pidPassengers[i], NULL, passengerThread, &t);
+        }
     }
 
-    while(t.finished == false);
     
     return 0;
 }
