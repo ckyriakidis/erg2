@@ -3,6 +3,12 @@
 
 #define TIMESLEEP 3
 
+char numColor[] = "\033[0;33m";
+char tColor[] = "\033[0;35m";
+char pColor[] = "\033[0;36m";
+char errorColor[] = "\033[0;31m";
+char end[] = "\033[0m";
+
 struct train {
     int numPass;
     int maxPass;
@@ -14,11 +20,11 @@ struct train {
 
 void checkParams(int argc, char **argv) {
     if (argc != 2) {
-        fprintf(stderr, "usage: ./main <maxPassengers>\n");
+        fprintf(stderr, "%susage: ./main <maxPassengers>\n%s", errorColor, end);
         exit(-1);
     }
     if (atoi(argv[1]) <= 0) {
-        fprintf(stderr, "error: maxPassengers must be a positive integer\n");
+        fprintf(stderr, "%serror: maxPassengers must be a positive integer%s\n", errorColor, end);
         exit(-1);
     }
 }
@@ -27,9 +33,9 @@ void *trainThread(void *args) {
     struct train *t = (struct train *) args;
     while (mysem_down(&(t->train))) {
         
-        printf("Train running with %d passengers \n", t->numPass);
+        printf("%sTrain running with %s%d%s passengers \n%s",tColor, numColor, t->numPass, tColor, end);
         sleep(TIMESLEEP);
-        printf("Passengers left the train\n\n");
+        printf("%sPassengers left the train%s\n\n", tColor, end);
         sleep(TIMESLEEP / 2);
         t->numPass = 0;
 
@@ -41,7 +47,7 @@ void *passengerThread(void *args) {
     struct train *t = (struct train *) args;
     // printf("passenger %ld created and waiting to be called\n", pthread_self() % 10000);
     mysem_down(&(t->passenger));
-    printf("Passenger %ld entering train, %d total in train\n", pthread_self() % 10000, t->numPass + 1);
+    printf("%sPassenger %s%ld%s entering train, %s%d%s total in train%s\n", pColor, numColor, pthread_self() % 1000, pColor, numColor, t->numPass + 1, pColor, end);
     sleep(TIMESLEEP / 3);
     t->numPass++;
 
