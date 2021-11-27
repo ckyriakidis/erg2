@@ -3,12 +3,14 @@
 #include <pthread.h>
 #include <math.h>
 #include <unistd.h>
-#include "../assignment1/mysem.h"
+#include "../erg2/assignment1/mysem.h"
 
 struct threadStruct {
     struct mysem_t *s;
     struct mysem_t *wait;
     struct mysem_t *childDone;
+    struct mysem_t *mtx;
+    struct mysem_t *mtx2;
     bool mainDone;
     int input;
 };
@@ -39,9 +41,11 @@ void *func(void *args) {
             printf("%d is not prime\n", tmp);
         }
     }
+    mysem_up(tInput->mtx2);
     
     /* Signal that you're done */
-    while(! mysem_up(tInput->childDone));
+    mysem_down(tInput->mtx);
+    mysem_up(tInput->childDone);
     
     return (void *) NULL;
 }
@@ -71,11 +75,19 @@ int main(int argc, char *argv[]) {
     tInput.childDone = malloc(sizeof(struct mysem_t));
     tInput.childDone->valid = false;
     
+    tInput.mtx = malloc(sizeof(struct mysem_t));
+    tInput.mtx->valid = false;
+    
+    tInput.mtx2 = malloc(sizeof(struct mysem_t));
+    tInput.mtx2->valid = false;
+    
     pid = (pthread_t *) malloc(numWorkers * sizeof(pthread_t));
     
     mysem_init(tInput.s, 0);
     mysem_init(tInput.wait, 0);
     mysem_init(tInput.childDone, 0);
+    mysem_init(tInput.mtx, 1);
+    mysem_init(tInput.mtx2, 0);
     
     for (i = 0; i < numWorkers; i++)
         pthread_create(&pid[i], NULL, func, (void *) &tInput);
@@ -87,12 +99,16 @@ int main(int argc, char *argv[]) {
     
     /* Signal that you're done */
     tInput.mainDone = true;
-    for (i = 0; i < numWorkers; i++)
-        while(! mysem_up(tInput.s));
+    for (i = 0; i < numWorkers; i++) {
+        mysem_up(tInput.s);
+        mysem_down(tInput.mtx2);
+    }
     
     /* Wait for the workers to signal that they're done */
-    for (i = 0; i < numWorkers; i++)
+    for (i = 0; i < numWorkers; i++) {
         mysem_down(tInput.childDone);
+        mysem_up(tInput.mtx);
+    }
     
     free(tInput.s);
     free(tInput.wait);
