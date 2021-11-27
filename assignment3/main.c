@@ -11,17 +11,16 @@ char create[] = "\033[0;33m";
 char ended[] = "\033[0;35m";
 char give[] = "\033[0;32m";
 
-struct mysem_t mtx, lock;
+struct mysem_t mtx, mainEnd;
 struct mysem_t left, right;
-struct mysem_t mainEnd;
 
 int carsOnBridge = 0;
-int wl = 0, wr = 0;
-int direction = -1; //0 left to right, 1 right to left
+int waitingLeft = 0, waitingRight = 0;
+int direction = -1; //0 left to right, 1 right to left, -1 no direction
 int ret = -2;
 
 void *car_left(void *args) {
-    ++wl;
+    ++waitingLeft;
     mysem_down(&left);
     mysem_down(&mtx);
 
@@ -29,19 +28,14 @@ void *car_left(void *args) {
         mysem_up(&mtx);
         mysem_down(&left);
     }
-    else { //my direction
-        if (carsOnBridge == MAX_CARS) {
-            mysem_up(&mtx);
-            mysem_down(&left);
-        }
-    }
+
     if (carsOnBridge == MAX_CARS) mysem_down(&left);
-    if (carsOnBridge < MAX_CARS - 1 && wl > 0) {
+    if (carsOnBridge < MAX_CARS - 1 && waitingLeft > 0) {
         sleep(1);
         mysem_up(&left);
     }
     
-    --wl;
+    --waitingLeft;
     ++carsOnBridge;
     mysem_up(&mtx);
 
@@ -51,26 +45,26 @@ void *car_left(void *args) {
 
     mysem_down(&mtx);
     --carsOnBridge;
-    if (!carsOnBridge && wr > 0) {
+    if (!carsOnBridge && waitingRight > 0) {
         printf("%sGiving bridge to %sright %sside %s\n", give, rightc, give, end);
         direction = 1;
         mysem_up(&right);
     }
-    else if (!carsOnBridge && wl > 0) mysem_up(&left);
-    else if (!carsOnBridge && wl == 0) {
+    else if (!carsOnBridge && waitingLeft > 0) mysem_up(&left);
+    else if (!carsOnBridge && waitingLeft == 0) {
         printf("%sNo cars waiting, giving bridge to whoever comes first%s\n", give, end);
         direction = -1;
         mysem_up(&right);
         mysem_up(&left);
     }
     mysem_up(&mtx);
-    if (wl == 0 && wr == 0 && ret == -1) mysem_up(&mainEnd);
+    if (waitingLeft == 0 && waitingRight == 0 && ret == -1) mysem_up(&mainEnd);
     
     return (void *) NULL;
 }
 
 void *car_right(void *args) {
-    ++wr;
+    ++waitingRight;
     mysem_down(&right);
     mysem_down(&mtx);
 
@@ -78,18 +72,12 @@ void *car_right(void *args) {
         mysem_up(&mtx);
         mysem_down(&right);
     }
-    else { //my direction
-        if (carsOnBridge == MAX_CARS) {
-            mysem_up(&mtx);
-            mysem_down(&right);
-        }
-    }
     if (carsOnBridge == MAX_CARS) mysem_down(&right);
-    if (carsOnBridge < MAX_CARS - 1 && wr > 0) {
+    if (carsOnBridge < MAX_CARS - 1 && waitingRight > 0) {
         sleep(1);
         mysem_up(&right);
     }
-    --wr;
+    --waitingRight;
     ++carsOnBridge;
     mysem_up(&mtx);
 
@@ -99,19 +87,19 @@ void *car_right(void *args) {
 
     mysem_down(&mtx);
     --carsOnBridge;
-    if (!carsOnBridge && wl > 0) {
+    if (!carsOnBridge && waitingLeft > 0) {
         direction = 0;
         mysem_up(&left);
     }
-    else if (!carsOnBridge && wr > 0) mysem_up(&right);
-    else if (!carsOnBridge && wr == 0) {
+    else if (!carsOnBridge && waitingRight > 0) mysem_up(&right);
+    else if (!carsOnBridge && waitingRight == 0) {
         printf("%sNo cars waiting, giving bridge to whoever comes first%s\n", give, end);
         direction = -1;
         mysem_up(&right);
         mysem_up(&left);
     }
         mysem_up(&mtx);
-    if (wl == 0 && wr == 0 && ret == -1) mysem_up(&mainEnd);
+    if (waitingLeft == 0 && waitingRight == 0 && ret == -1) mysem_up(&mainEnd);
     
     return (void *) NULL;
 }
@@ -136,7 +124,6 @@ int main(int argc, char *argv[]) {
     while(1) {
         ret = fscanf(f, "%c %d %d\n", &side, &num, &delay);
         if (ret == -1) break;
-                printf("%c %d %d\n", side, num, delay);
         total += num;
         pid = realloc(pid, total * sizeof(pthread_t));
         if (side == 'L') {
@@ -157,11 +144,14 @@ int main(int argc, char *argv[]) {
         }
         sleep(delay);
     }
-    printf("%s\n=-=-=-=-=-=-=-=-=-=-=-=\nInput ended, waiting all cars to finish\n=-=-=-=-=-=-=-=-=-=-=-=\n\n%s", ended, end);
 
+    fclose(f);
+
+    printf("%s\n=-=-=-=-=-=-=-=-=-=-=-=\nInput ended, waiting all cars to finish\n=-=-=-=-=-=-=-=-=-=-=-=\n\n%s", ended, end);
     mysem_down(&mainEnd);
     sleep(TIME_TO_PASS);
     printf("%s\n=-=-=-=-=-=-=-=-=-=-=-=\nNo cars left, exiting\n=-=-=-=-=-=-=-=-=-=-=-=\n\n%s", ended, end);
+
     free(pid);
     
     return 0;

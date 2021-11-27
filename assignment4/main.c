@@ -10,10 +10,8 @@ char errorColor[] = "\033[0;31m";
 char end[] = "\033[0m";
 
 struct train {
-    int numPass;
-    int maxPass;
-    int passengersLeft;
-    bool finished;
+    int numPassengers;
+    int maxPassengers;
     struct mysem_t train;
     struct mysem_t passenger;
 };
@@ -33,11 +31,11 @@ void *trainThread(void *args) {
     struct train *t = (struct train *) args;
     while (mysem_down(&(t->train))) {
         
-        printf("%sTrain running with %s%d%s passengers \n%s",tColor, numColor, t->numPass, tColor, end);
+        printf("%sTrain running with %s%d%s passengers \n%s",tColor, numColor, t->numPassengers, tColor, end);
         sleep(TIMESLEEP);
         printf("%sPassengers left the train%s\n\n", tColor, end);
         sleep(TIMESLEEP / 2);
-        t->numPass = 0;
+        t->numPassengers = 0;
 
         mysem_up(&(t->passenger));
     }
@@ -47,12 +45,13 @@ void *passengerThread(void *args) {
     struct train *t = (struct train *) args;
     // printf("passenger %ld created and waiting to be called\n", pthread_self() % 10000);
     mysem_down(&(t->passenger));
-    printf("%sPassenger %s%ld%s entering train, %s%d%s total in train%s\n", pColor, numColor, pthread_self() % 1000, pColor, numColor, t->numPass + 1, pColor, end);
+    printf("%sPassenger %s%ld%s entering train, %s%d%s total in train%s\n", pColor, numColor, pthread_self() % 1000, pColor, numColor, t->numPassengers + 1, pColor, end);
+    t->numPassengers++;
     sleep(TIMESLEEP / 3);
-    t->numPass++;
 
-    if (t->numPass == t->maxPass) mysem_up(&(t->train));
+    if (t->numPassengers == t->maxPassengers) mysem_up(&(t->train));
     else mysem_up(&(t->passenger));
+    
     return (void *) NULL;
 }
 
@@ -64,8 +63,8 @@ int main(int argc, char **argv) {
     int totalPassengers = 0;
 
     checkParams(argc, argv);
-    t.maxPass = atoi(argv[1]);
-    t.numPass = 0;
+    t.maxPassengers = atoi(argv[1]);
+    t.numPassengers = 0;
     
     t.train.valid = false;
     t.passenger.valid = false;
