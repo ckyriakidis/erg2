@@ -51,7 +51,7 @@ void *passengerThread(void *args) {
 
     if (t->numPassengers == t->maxPassengers) mysem_up(&(t->train));
     else mysem_up(&(t->passenger));
-    
+
     return (void *) NULL;
 }
 
@@ -69,6 +69,7 @@ int main(int argc, char **argv) {
     t.train.valid = false;
     t.passenger.valid = false;
     mysem_init(&(t.train), 0);
+    
     pthread_create(&pidTrain, NULL, trainThread, &t);
     pidPassengers = malloc(sizeof(pthread_t));
     mysem_init(&(t.passenger), 1);
